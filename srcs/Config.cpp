@@ -48,6 +48,25 @@ bool Config::load_theme(const std::string& filePath)
         theme.font = j.value("font", "");
         theme.fontAscii = j.value("fontascii", "");
 
+        // If the current theme doesn't specify a font, use the CrossMix - OS theme
+        // as a fallback to avoid crashes when font is missing.
+        if (theme.font.empty()) {
+            const std::string fallbackPath = "/mnt/SDCARD/Themes/CrossMix - OS/config.json";
+            try {
+                if (fs::exists(fallbackPath)) {
+                    std::ifstream fb(fallbackPath);
+                    if (fb.is_open()) {
+                        nlohmann::json fj;
+                        fb >> fj;
+                        theme.font = fj.value("font", theme.font);
+                    }
+                }
+            } catch (const std::exception& e) {
+                // Ignore fallback errors; keep theme.font empty if not found.
+                std::cerr << "Warning: could not load fallback font config: " << e.what() << std::endl;
+            }
+        }
+
         if (j.contains("fontsize")) {
             for (const auto& [key, value] : j["fontsize"].items()) {
                 theme.fontSize[key] = value.get<int>();
