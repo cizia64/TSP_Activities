@@ -392,15 +392,37 @@ void GUI::launch_game(
 
 Vec2 GUI::render_image(const std::string& image_path, int x, int y, int w, int h, int flags)
 {
-    if (image_path.empty() || !fs::exists(image_path))
+    if (image_path.empty())
         return {0, 0};
-    if (image_cache.find(image_path) == image_cache.end()) {
-        SDL_Surface* surface = IMG_Load(image_path.c_str());
-        image_cache[image_path] = {
-            SDL_CreateTextureFromSurface(renderer, surface), surface->w, surface->h};
+
+    std::string resolved_path = image_path;
+
+    // If the requested path doesn't exist and looks like a theme skin path, try fallback
+    if (!fs::exists(resolved_path)) {
+        const std::string theme_prefix = cfg.theme_path + "skin/";
+        if (resolved_path.rfind(theme_prefix, 0) == 0) {
+            // Build fallback path under /usr/trimui/res/
+            std::string relative = resolved_path.substr(theme_prefix.size());
+            std::string fallback = std::string("/mnt/SDCARD/Themes/CrossMix - OS/skin/") + relative;
+            if (fs::exists(fallback)) {
+                resolved_path = fallback;
+            }
+        }
+    }
+
+    if (!fs::exists(resolved_path))
+        return {0, 0};
+
+    if (image_cache.find(resolved_path) == image_cache.end()) {
+        SDL_Surface* surface = IMG_Load(resolved_path.c_str());
+        if (!surface) {
+            std::cerr << "Failed to load image: " << resolved_path << " (" << IMG_GetError() << ")" << std::endl;
+            return {0, 0};
+        }
+        image_cache[resolved_path] = {SDL_CreateTextureFromSurface(renderer, surface), surface->w, surface->h};
         SDL_FreeSurface(surface);
     }
-    CachedImg& cached_texture = image_cache[image_path];
+    CachedImg& cached_texture = image_cache[resolved_path];
 
     int width = w;
     int height = h;
